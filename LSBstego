@@ -1,0 +1,60 @@
+import os
+
+new_image_path = r"C:/Users/Olzhas/Pictures/hidden_message.bmp"
+image_path = r"C:/Users/Olzhas/Pictures/image.bmp"
+
+
+def hide_text(image_path, message, new_image_path):
+    message += "\0"
+    message_bytes = message.encode()
+    size = len(message_bytes).to_bytes(4, byteorder="big")
+
+    with open(image_path, "rb") as src, open(new_image_path, "wb") as dst:
+        header = src.read(54)
+        dst.write(header)
+
+        pixels = bytearray(src.read())
+
+        data = size + message_bytes
+        data_bits = "".join(f"{byte:08b}" for byte in data)
+
+        if len(data_bits) > len(pixels):
+            raise ValueError("Сообщение слишком длинное для этого изображения!")
+
+        for i in range(len(data_bits)):
+            pixels[i] = (pixels[i] & 0b11111110) | int(data_bits[i])
+
+        dst.write(pixels)
+
+
+def reveal_text(image_path):
+    with open(image_path, "rb") as file:
+        file.seek(54)
+        pixels = file.read()
+
+        bits = [str(pixels[i] & 1) for i in range(32)]
+        size = int("".join(bits), 2)
+
+        bits = [str(pixels[i] & 1) for i in range(32, 32 + size * 8)]
+        message_bytes = bytes(int("".join(bits[i:i + 8]), 2) for i in range(0, len(bits), 8))
+
+        return message_bytes.split(b"\0")[0].decode()
+
+
+if __name__ == "__main__":
+    if not os.path.exists(image_path):
+        print(f"Файл табылмады: {image_path}")
+    else:
+        action = input("1: Спрятать сообщение\n2: Раскрыть сообщение\nВыбор: ")
+
+        if action == "1":
+            secret_message = input("Введите секретное сообщение: ")
+            hide_text(image_path, secret_message, new_image_path)
+            print(f"Сообщение спрятано в {new_image_path}")
+
+        elif action == "2":
+            extracted_message = reveal_text(new_image_path)
+            print("Скрытое сообщение:", extracted_message)
+
+        else:
+            print("Ошибка ввода.")
